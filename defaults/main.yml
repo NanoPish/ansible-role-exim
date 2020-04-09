@@ -1,11 +1,61 @@
 ---
-# Main configuration type. Should be 'internet' for public mail sending, or
-# 'local' if mail should only be delivered locally. See Exim documentation for
-# other options.
-exim_dc_eximconfig_configtype: internet
 
-# Other exim directives.
-exim_dc_localdelivery: mail_spool
+# ADVICE: READ EXIM MANUAL
+# THE DC_* VARS MAP TO EXIM CONFIGURATION
+
+# NEEDS TO BE SELECTED
+exim_dc_eximconfig_configtype: none
+
+exim_dc_other_hostnames: ''
+
+exim_dc_local_interfaces: '127.0.0.1 ; ::1'
+
+exim_dc_readhost: ''
+
+exim_dc_relay_domains: ''
+
+exim_dc_minimaldns: 'false'
+
+exim_dc_relay_nets: ''
+
+exim_dc_smarthost: ''
+
+exim_CFILEMODE: '644'
+
+exim_dc_use_split_config: 'false'
+
+exim_dc_hide_mailname: 'true'
+
+exim_dc_localdelivery: 'mail_spool'
+
+exim_dc_postmaster: 'root'
+
+
+# CUSTOM HIGH LEVEL CONFIGURATION
 
 # Set a primary_hostname. If empty, the directive will be ignored.
 exim_primary_hostname: ""
+
+# generate a certificate for TLS with exim-gencert
+exim_generate_certificate: false
+
+exim_certificate_hostname: "{{ ansible_hostname }}"
+
+# Use TLS
+# Requires your own exim certificate or setting 'exim_generate_certificate: true' below
+exim_use_TLS: false
+
+# TLS ports
+exim_use_TLS_ports: '25'
+
+# TLS protocol
+exim_require_protocol: 'smtp'
+
+# TLS on which smarthosts
+exim_smarthosts_tls: '*'
+
+# Generates exim4 passwd.client from this array: contains account and password data for SMTP authentication when exim is authenticating as a client to some remote server.
+# see exim4_passwd_client(5) for more documentation
+# example: exim_smtp_clients: ['smtp.gmail.com:yourAccount@gmail.com:yourPassword', '*.google.com:yourAccount@gmail.com:yourPassword']
+exim_smtp_passwd_clients: []
+

@@ -1,13 +1,31 @@
 ---
+
 # Include variables and define needed variables.
 - name: Include OS-specific variables.
   include_vars: "{{ ansible_os_family }}.yml"
 
 # Setup/install tasks.
-- name: Ensure exim is installed.
+- name: Ensure exim installed
   package: "name={{ exim_package }} state=present"
 
-- name: Configure exim (Debian only).
+- name: Ensure openssl installed
+  package:
+    state: present
+    name: openssl
+  when: exim_generate_certificate is defined and exim_generate_certificate
+
+- name: have ca-certificates installed
+  package:
+    state: present
+    name: ca-certificates
+  when: exim_generate_certificate is defined and exim_generate_certificate
+
+- name: have python-pexpect installed
+  package:
+    state: present
+    name: python-pexpect
+
+- name: Configure exim
   lineinfile:
     dest: "{{ exim_configuration_file }}"
     regexp: "{{ item.regexp }}"
@@ -16,10 +34,28 @@
   with_items:
     - regexp: '^dc_eximconfig_configtype'
       line: "dc_eximconfig_configtype='{{ exim_dc_eximconfig_configtype }}'"
+    - regexp: '^dc_other_hostnames'
+      line: "dc_other_hostnames='{{ exim_dc_other_hostnames }}'"
+    - regexp: '^dc_local_interfaces'
+      line: "dc_local_interfaces='{{ exim_dc_local_interfaces }}'"
+    - regexp: '^dc_readhost'
+      line: "dc_readhost='{{ exim_dc_readhost }}'"
+    - regexp: '^dc_relay_domains'
+      line: "dc_relay_domains='{{ exim_dc_relay_domains }}'"
+    - regexp: '^dc_minimaldns'
+      line: "dc_minimaldns='{{ exim_dc_minimaldns }}'"
+    - regexp: '^dc_relay_nets'
+      line: "dc_relay_nets='{{ exim_dc_relay_nets }}'"
+    - regexp: '^dc_smarthost'
+      line: "dc_smarthost='{{ exim_dc_smarthost }}'"
+    - regexp: '^CFILEMODE'
+      line: "CFILEMODE='{{ exim_CFILEMODE }}'"
+    - regexp: '^dc_use_split_config'
+      line: "dc_use_split_config='{{ exim_dc_use_split_config }}'"
+    - regexp: '^dc_hide_mailname'
+      line: "dc_hide_mailname='{{ exim_dc_hide_mailname }}'"
     - regexp: '^dc_localdelivery'
       line: "dc_localdelivery='{{ exim_dc_localdelivery }}'"
-  notify: restart exim
-  when: ansible_os_family == 'Debian'
 
 - name: Configure primary_hostname (if set).
   lineinfile:
@@ -27,8 +63,88 @@
     regexp: '^#?\s?primary_hostname'
     line: "primary_hostname={{ exim_primary_hostname }}"
     state: present
-  notify: restart exim
   when: exim_primary_hostname is defined and exim_primary_hostname
+
+# Configure credentials for logging to smtp relay, like gmail or online.net to send mail through them
+- name: Generate exim4 passwd.client that contains account and password data for SMTP authentication when exim is authenticating as a client to some remote server.
+  lineinfile:
+    path: /etc/exim4/passwd.client
+    owner: Debian-exim
+    group: Debian-exim
+    mode: "600"
+    line: '{{ item }}'
+    state: present
+  with_items: "{{ exim_smtp_passwd_clients }}"
+  when: exim_smtp_passwd_clients is defined and exim_smtp_passwd_clients|length > 0
+
+# configuring TLS tasks
+- name: Template exim4 localmacros
+  template:
+    src: templates/exim.conf.localmacros.j2
+    dest: /etc/exim4/exim.conf.localmacros
+    owner: Debian-exim
+    group: Debian-exim
+    mode: "{{ exim_CFILEMODE }}"
+  when: exim_use_TLS is defined and exim_use_TLS
+
+# Generate exim certificate needed for smtp satellite
+- name: Exim-gencert
+  expect:
+    command: "/usr/share/doc/exim4-base/examples/exim-gencert"
+    responses:
+      'Country Code \(2 letters\) \[US\]': ''
+      'State or Province Name \(full name\) \[\]': ''
+      'Locality Name (eg, city) \[\]': ''
+      'Organization Name (eg, company; recommended) \[\]': ''
+      'Organizational Unit Name (eg, section) \[\]': ''
+      'Server name \(eg\. ssl\.domain\.tld\; required\!\!\!\) \[\]': "{{ exim_certificate_hostname }}"
+  when: exim_generate_certificate is defined and exim_generate_certificate
+
+- name: save file exim4.conf.template for existing require protocol statement
+  shell: cat /etc/exim4/exim4.conf.template
+  register: templatesave
+
+- name: configure exim4.conf.template for require protocol
+  replace:
+    dest: /etc/exim4/exim4.conf.template
+    replace: |
+      .ifdef REMOTE_SMTP_SMARTHOST_HOSTS_REQUIRE_TLS
+        hosts_require_tls = REMOTE_SMTP_SMARTHOST_HOSTS_REQUIRE_TLS
+      .endif
+      .ifdef REQUIRE_PROTOCOL
+        protocol = REQUIRE_PROTOCOL
+      .endif
+    regexp: '.ifdef REMOTE_SMTP_SMARTHOST_HOSTS_REQUIRE_TLS\n  hosts_require_tls = REMOTE_SMTP_SMARTHOST_HOSTS_REQUIRE_TLS\n.endif'
+  when:
+    - exim_use_TLS is defined and exim_use_TLS
+    - templatesave.stdout.find('  protocol = REQUIRE_PROTOCOL') == -1
+
+- name: configure exim4.conf.template for tls ports
+  blockinfile:
+    state: present
+    path: /etc/exim4/exim4.conf.template
+    block: |
+      .ifdef TLS_ON_CONNECT_PORTS
+        tls_on_connect_ports = TLS_ON_CONNECT_PORTS
+      .endif
+    insertafter: '^\.ifdef MAIN_TLS_ENABLE'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK insertion 1 - TLS ON CONNECT PORTS"
+  when: exim_use_TLS is defined and exim_use_TLS
+
+# Sender name rewriting, keep domain
+- name: configure exim4.conf.template for address rewrite
+  blockinfile:
+    state: present
+    path: /etc/exim4/exim4.conf.template
+    block: |
+      *@* {{ exim_sender_rewrite }}@$2 Ffrs
+    insertafter: '^begin rewrite'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK insertion 2 - ADDRESS REWRITE"
+  when: exim_use_TLS is defined and exim_use_TLS
+    
+- name: Update exim conf
+  shell: "update-exim4.conf"
+  notify: restart exim
 
 - name: Ensure exim is running.
   service: "name={{ exim_daemon }} state=started enabled=yes"

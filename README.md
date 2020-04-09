@@ -4,6 +4,13 @@
 
 Installs Exim (a Mail Transfer Agent) on RedHat/CentOS or Debian/Ubuntu.
 
+The original from geerlingguy/ansible-role-exim aims at using smtp to send mail directy (config type: internet)
+This fork can be configured for multiple modes.
+
+I use it for configuring exim4 as an smtp satellite that sends mails through an smtp relay, like gmail or online.net
+
+It supports TLS, generating exim certificate, configuring smtp relay and credentials, adding localmacros, changing most of dc_* configs
+
 ## Requirements
 
 None.
@@ -32,7 +39,27 @@ None.
 
     - hosts: servers
       roles:
-        - geerlingguy.exim
+        - ansible-role-exim:
+	  import_role:
+            name: exim
+          vars:
+            exim_dc_eximconfig_configtype: 'satellite'
+            exim_dc_local_interfaces: '127.0.0.1 ; ::1'
+            exim_dc_readhost: '{{ inventory_hostname }}'
+            exim_dc_minimaldns: 'false'
+            exim_dc_smarthost: 'smtp.online.net::25'
+            exim_dc_hide_mailname: 'true'
+            exim_dc_localdelivery: 'mail_spool'
+            exim_primary_hostname: '{{ inventory_hostname }}'
+            exim_generate_certificate: true
+            exim_certificate_hostname: "{{ inventory_hostname }}"
+            exim_use_TLS: true
+            exim_use_TLS_ports: '25'
+            exim_require_protocol: 'smtp'
+            exim_smarthosts_tls: '*'
+            exim_smtp_passwd_clients: ['*.smtp.host.net:john@doe.online.net:password']
+            exim_sender_rewrite: 'reporting-mailbox'
+	
 
 ## License
 
@@ -41,3 +68,4 @@ MIT / BSD
 ## Author Information
 
 This role was created in 2015 by [Jeff Geerling](https://www.jeffgeerling.com/), author of [Ansible for DevOps](https://www.ansiblefordevops.com/).
+This role was modified in 2020 by Paul Belloc

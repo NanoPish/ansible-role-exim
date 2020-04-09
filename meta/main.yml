@@ -2,17 +2,14 @@
 dependencies: []
 
 galaxy_info:
-  author: geerlingguy
-  description: Exim installation for Linux.
-  company: "Midwestern Mac, LLC"
+  author: NanoPish
+  description: Advanced Exim installation for Debian
+  company: "ECCM Performance"
   license: "license (BSD, MIT)"
   min_ansible_version: 2.0
   platforms:
-    - name: EL
-      versions:
-        - all
-    - name: Ubuntu
-      versions:
+    - name: Debian
+      verions:
         - all
   galaxy_tags:
     - system
@@ -20,3 +17,5 @@ galaxy_info:
     - exim
     - sendmail
     - email
+    - smarthost
+    - smtp
