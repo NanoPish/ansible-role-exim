@@ -98,7 +98,7 @@
       'Organization Name (eg, company; recommended) \[\]': ''
       'Organizational Unit Name (eg, section) \[\]': ''
       'Server name \(eg\. ssl\.domain\.tld\; required\!\!\!\) \[\]': "{{ exim_certificate_hostname }}"
-  become-user: root
+  become_user: root
   when: exim_generate_certificate is defined and exim_generate_certificate
 
 - name: save file exim4.conf.template for existing require protocol statement
