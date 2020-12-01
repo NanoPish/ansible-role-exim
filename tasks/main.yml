@@ -90,16 +90,18 @@
 # Generate exim certificate needed for smtp satellite
 - name: Exim-gencert
   expect:
-    command: "/usr/share/doc/exim4-base/examples/exim-gencert"
+    command: "/usr/share/doc/exim4-base/examples/exim-gencert --force"
     responses:
-      'Country Code \(2 letters\) \[US\]': ''
-      'State or Province Name \(full name\) \[\]': ''
-      'Locality Name (eg, city) \[\]': ''
-      'Organization Name (eg, company; recommended) \[\]': ''
-      'Organizational Unit Name (eg, section) \[\]': ''
-      'Server name \(eg\. ssl\.domain\.tld\; required\!\!\!\) \[\]': "{{ exim_certificate_hostname }}"
+     .*Country.*: ''
+     .*State.*: ''
+     .*Locality.*: ''
+     .*Organization Name.*: ''
+     .*Organizational Unit.*: ''
+     .*Server name.*: "{{ exim_certificate_hostname }}"
+     .*Email Address.*: "{{ reporting_mail }}"
   become_user: root
   when: exim_generate_certificate is defined and exim_generate_certificate
+  tags: exim-gencert
 
 - name: save file exim4.conf.template for existing require protocol statement
   shell: cat /etc/exim4/exim4.conf.template
